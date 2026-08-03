@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jnb"
+dynamic = ["version"]
+description = "The J language in notebooks, with j magics for IPython and Jupyter and a kernmini-based J kernel"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "Jeremy Howard", email = "github@jhoward.fastmail.fm"}]
+keywords = ['nbdev', 'jupyter', 'notebook', 'python', 'j', 'jsoftware', 'kernel']
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = ['fastcore', 'kernmini>=0.1.0']
+
+[project.urls]
+Repository = "https://github.com/AnswerDotAI/jnb"
+Documentation = "https://AnswerDotAI.github.io/jnb/"
+
+[project.entry-points.nbdev]
+jnb = "jnb._modidx:d"
+
+[project.scripts]
+jnb_install = "jnb:create_ipython_config"
+jkernel = "jnb.jkernel:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "jnb.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["jnb"]
+
+[tool.nbdev]

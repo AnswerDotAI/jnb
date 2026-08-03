@@ -1,0 +1,14 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "jnb"
+  site-url: "https://AnswerDotAI.github.io/jnb"
+  description: "The J language in notebooks, with j magics for IPython and Jupyter and a kernmini-based J kernel"
+  repo-branch: main
+  repo-url: "https://github.com/AnswerDotAI/jnb"
+
+format-links:
+  - html
+  - format: commonmark
+    text: Markdown
