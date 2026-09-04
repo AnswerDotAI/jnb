@@ -1,0 +1,162 @@
+[
+  {
+    "objectID": "j.html",
+    "href": "j.html",
+    "title": "j",
+    "section": "",
+    "text": "J’s console, jconsole, is a thin wrapper around libj, the J engine shared library. Rather than scraping the console over a pipe, iversonnb loads libj directly: JDo runs one line of J and returns only when it’s done, output arrives through a callback we register, and JInterrupt stops a long computation from another thread. The engine, its C API (jsource/jsrc/jlib.h), and profile.ijs (the standard library bootstrap) all ship with every J install, including pip install jlanguage. This notebook builds the binding up one step at a time.",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#finding-j",
+    "href": "j.html#finding-j",
+    "title": "j",
+    "section": "Finding J",
+    "text": "Finding J\n\n\nsource\n\nfind_j\ndef find_j():\nLocate the J binary directory: the one containing libj and profile.ijs\n\n\nA J install is a directory with bin/ holding the engine library and profile.ijs side by side. which finds a real jconsole and resolves symlinks to its directory (the pip install jlanguage console script is a Python shim with no libj next to it, so the existence check skips it and the jlang import supplies the path instead). The fallbacks scan the standard per-OS install locations.\n\nfind_j()\n\nPath('/Users/jhoward/aai-ws/.venv/lib/python3.13/site-packages/jlang/bin')",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#the-engine",
+    "href": "j.html#the-engine",
+    "title": "j",
+    "section": "The engine",
+    "text": "The engine\n\n\nsource\n\nload_j\ndef load_j(\n    jbin:NoneType=None\n):\nLoad libj from jbin (or find_j()), declare its C signatures, and return (jbin,lib)\n\n\nThe whole API is in jsource/jsrc/jlib.h: JInit2 returns an engine instance told where its own directory is (bare JInit exists too, but then the engine can’t find libgmp next to itself, so extended precision breaks – and mixing the two in one process can crash), JDo runs one line of J against it, and JSM registers a 5-slot callback array {output, wd, input, unused, options} (jconsole passes exactly {Joutput, 0, Jinput, 0, SMCON}). The output callback receives everything J writes, tagged with a type: 1 is a formatted result, 2 an error display, 5 an exit request from 2!:55 (the text pointer carries the exit code, so it’s declared c_void_p and decoded per type – it can be NULL). The input callback supplies continuation lines when a multi-line definition is open. Here’s the smallest working setup, callbacks that just collect into a list:\n\njbin,lib = load_j()\njt = lib.JInit2(str(jbin).encode())\nout = []\n@_OUTCB\ndef outcb(j,typ,p): out.append((typ, ctypes.string_at(p).decode('utf-8','replace') if p else p))\ncbs = (c_void_p*5)(cast(outcb,c_void_p), None, None, None, _SMCON)\nlib.JSM(jt, cbs)\nlib.JDo(jt, b'+/ % # 1 2 3 4'), out\n\n(0, [(1, '0.25\\n')])\n\n\nJDo returns 0 for success (the J error number otherwise), and by the time it returns, the result has already arrived through the callback: completion detection is free, no prompt-scraping or sentinel needed. But this is a bare engine: no standard library. jconsole boots one by running a first sentence that sets BINPATH and ARGV and then runs profile.ijs (see jefirst in jsource/jsrc/jeload.c); we do the same. J executes right to left, so BINPATH is set first:\n\nout.clear()\nboot = f\"(3 : '0!:0 y')&lt;BINPATH,'/profile.ijs'[ARGV_z_=:&lt;'jconsole'[BINPATH_z_=:'{jbin}'\"\nlib.JDo(jt, boot.encode()), out\n\n(0, [])\n\n\nThe stdlib is now loaded:\n\nout.clear()\nlib.JDo(jt, b\"toupper 'j is here'\"), out\n\n(0, [(1, 'J IS HERE\\n')])",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#errors",
+    "href": "j.html#errors",
+    "title": "j",
+    "section": "Errors",
+    "text": "Errors\nErrors need no scraping either: JDo returns the J error number, and the error display arrives as type-2 output. JError carries the session’s display as its message, like AplError does:\n\nout.clear()\nlib.JDo(jt, b\"1 + 'a'\"), out\n\n(3, [(2, \"|domain error, executing dyad +\\n|y is character\\n|   1    +'a'\\n\")])\n\n\n\n\nsource\n\nJError\ndef JError(\n    *args, **kwargs\n):\nA J error, carrying the session’s output (including the error display) as its message",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#a-session-object",
+    "href": "j.html#a-session-object",
+    "title": "j",
+    "section": "A session object",
+    "text": "A session object\nJ packages all of the above: load, init, register callbacks, boot the profile. The output callback collects (type,text) pairs, records exit requests, and guards against NULL. The input callback pops lines from a queue that run fills: J calls it whenever a multi-line definition is open, so a whole cell can be queued and each line lands where it belongs – top-level lines via JDo, body lines via the callback. The returned buffer is kept alive on self because the engine reads it after the callback returns (returning a Python bytes directly would leak: ctypes can’t manage the lifetime, and warns so).\n\n\nsource\n\nJ\ndef J(\n    jbin:NoneType=None\n):\nA J session: the libj engine loaded in-process, with the stdlib profile booted\n\n\nrun queues the cell’s lines and feeds each remaining top-level line to JDo (a definition’s body lines are consumed from the queue by the input callback in between). Any nonzero return raises JError with everything the session printed, error display included; otherwise that output is returned:\n\n\nsource\n\nJ.run\ndef run(\n    code\n):\nRun code (one or more lines of J) in the session, returning its output; raises JError on J errors\n\n\n\nj = J()\nprint(j.run('m =: 2 3 $ 10 * 1 + i. 6\\nm'))\n\n10 20 30\n40 50 60\n\n\n\nState persists across calls, multi-line definitions work (the body lines travel through the input callback), and errors raise JError with the session’s error display:\n\ntest_eq(j.run('+/ , m'), '210\\n')\ntest_eq(j.run('mean =: 3 : 0\\n(+/ y) % # y\\n)\\nmean 1 2 3 4'), '2.5\\n')\ntest_fail(lambda: j.run(\"m + 'x'\"), contains='domain error')\n\nWrapping every use in print(j.run(...)) is clunky. __call__ makes the session itself a function, and JOut’s verbatim __repr__ means bare expressions display exactly as they do in a J session, while still comparing and slicing as ordinary strings. A call with no output returns None, so nothing displays:\n\n\nsource\n\nJ.__call__\ndef __call__(\n    code\n):\nRun code, returning session output (or None if there is none)\n\n\n\n\nsource\n\nJOut\ndef JOut(\n    *args, **kwargs\n):\nOutput text from a J call; displays verbatim\n\n\n\nj('m ,. |. m')\n\n10 20 30 40 50 60\n40 50 60 10 20 30\n\n\n\ntest_eq(j('+/ , m'), '210\\n')\ntest_is(j('m2 =: 10 * m'), None)\n\nExtended precision works because JInit2 lets the engine find its bundled libgmp:\n\nj('*/ 1 + i. 25x')\n\n15511210043330985984000000",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#getting-values-into-python",
+    "href": "j.html#getting-values-into-python",
+    "title": "j",
+    "section": "Getting values into Python",
+    "text": "Getting values into Python\nrun returns display text: what you want to look at, not what you want to compute with. JGetM hands over a noun’s actual data: type, rank, and pointers to shape and ravel, straight out of engine memory. The common types map directly (booleans and integers, floats, characters); anything else (boxed, extended, rational) raises. _nest folds the flat ravel back into the array’s shape:\n\n\nsource\n\nJ.getm\ndef getm(\n    name\n):\nRead noun name into Python: str for characters; int/float scalars and (nested) lists otherwise\n\n\npyval evaluates an arbitrary expression by assigning it to a scratch noun, reading that, and erasing it. Square brackets read better still:\n\n\nsource\n\nJ.__getitem__\ndef __getitem__(\n    expr\n):\nCall self as a function.\n\n\n\n\nsource\n\nJ.pyval\ndef pyval(\n    expr\n):\nEvaluate expr and return the result as a Python value\n\n\n\ntest_eq(j['m'], [[10,20,30],[40,50,60]])\ntest_eq(j['m &gt; 25'], [[0,0,1],[1,1,1]])\ntest_eq(j['+/ % # 1 2 3 4'], 0.25)\ntest_eq(j[\"'py' , 'val'\"], 'pyval')\n\nJSetM is the same interface in reverse, so Python values can go into the workspace too: _jdat builds the typed buffers (strings as characters; numbers as integers, or floats if any element is one), and __setitem__ ships them. fn rounds the ergonomics out, turning any J verb into a Python callable – one argument applies it monadically, two dyadically, in J’s left-argument-first order:\n\n\nsource\n\nJ.__setitem__\ndef __setitem__(\n    nm, v\n):\nAssign Python value v (scalar, string, or nested list) to noun nm\n\n\n\nj['q'] = [[1,2],[3,4.5]]\ntest_eq(j['q'], [[1,2],[3,4.5]])\nj['s'] = \"it's\"\ntest_eq(j['s'], \"it's\")\ntest_eq(j['+/ , q'], 10.5)\n\n\n\nsource\n\nJ.fn\ndef fn(\n    code\n):\nA Python callable applying J verb code monadically or dyadically (left argument first)\n\n\n\nsq = j.fn('*:')\ntest_eq(sq([1,2,3]), [1,4,9])\ntest_eq(j.fn('+/')([1,2,3]), 6)\ntest_eq(j.fn('{.')(2, [5,6,7]), [5,6])",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#interrupting",
+    "href": "j.html#interrupting",
+    "title": "j",
+    "section": "Interrupting",
+    "text": "Interrupting\nJDo blocks its calling thread at the C level, so a Python signal handler can’t run while J computes – whoever hosts a J session must call interrupt from another thread (that’s exactly what the jkernel worker does with SIGINT). It’s safe cross-thread: it just sets the engine’s break flag, which J polls between sentences, so the running line stops with an attention interrupt error and the session survives:\n\n\nsource\n\nJ.interrupt\ndef interrupt():\nStop the currently running sentence with an attention interrupt; safe to call from another thread\n\n\n\nimport threading,time\n\n\nj('spin =: 3 : 0\\nn =. 0\\nwhile. n &lt; 1e8 do. n =. n + 1 end.\\n)')\nt0 = time.time()\nthreading.Timer(0.5, j.interrupt).start()\ntest_fail(lambda: j('spin 0'), contains='attention interrupt')\nassert time.time()-t0 &lt; 5\ntest_eq(j('2+2'), '4\\n')",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#exit-requests-and-shutdown",
+    "href": "j.html#exit-requests-and-shutdown",
+    "title": "j",
+    "section": "Exit requests and shutdown",
+    "text": "Exit requests and shutdown\nWhen J code asks to leave (exit 0, or the 2!:55 foreign it wraps), the request arrives as a type-5 output whose text pointer carries the exit code. The engine itself keeps going – it’s the front end’s decision – so J records the code in .exited, run returns quietly instead of raising, and a host like the jkernel can honor it. Unlike a Dyalog session there’s no child process to orphan: the engine lives and dies with the host process, so no atexit handling is needed and close (or the context manager) exists just to free the instance’s memory explicitly. A closed session is unusable.\n\n\nsource\n\nJ.__exit__\ndef __exit__(\n    *args\n):\nCall self as a function.\n\n\n\n\nsource\n\nJ.__enter__\ndef __enter__():\nCall self as a function.\n\n\n\n\nsource\n\nJ.close\ndef close():\nFree the engine instance; the session is unusable afterwards\n\n\n\nwith J() as j2:\n    test_is(j2.exited, None)\n    j2('exit 7')\n    test_eq(j2.exited, 7)",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#the-j-magics",
+    "href": "j.html#the-j-magics",
+    "title": "j",
+    "section": "The j magics",
+    "text": "The j magics\n%%j runs a cell and displays the session output verbatim; %j expr returns the expression’s value as a Python object (it’s just j[expr]), so it works on the right of an assignment: z = %j z. A trailing ; on a cell suppresses its output, and the engine only starts on first use, not when the magic is registered. Loading the iversonnb.j extension registers it.\n\n\nsource\n\nJMagic\ndef JMagic(\n    jbin:NoneType=None\n):\nIPython %j/%%j magics, driving a lazily-started J session\n\n\n\n\nsource\n\nload_ipython_extension\ndef load_ipython_extension(\n    ipython\n):\nRequired function for creating magic\n\n\n\n\nsource\n\ncreate_j_magic\ndef create_j_magic(\n    shell:NoneType=None\n):\nCreate a JMagic and register its j line/cell magic with shell, returning it\n\n\n\n# Only required if you don't load the extension\nmagic = create_j_magic()\n\n\n\nsource\n\ncreate_ipython_config\ndef create_ipython_config():\nCalled by jnb_install to register the extension in every IPython and Jupyter session\n\n\n\n\nsource\n\nload_ipython_extension\ndef load_ipython_extension(\n    ipython\n):\nRegister the j magics: %load_ext jnb\n\n\n\n%%j\nm3 =: 3 3 $ i. 9\nm3 +/ . * m3\n\n15 18  21\n42 54  66\n69 90 111\n\n\nThe line magic brings values back into Python, and a trailing ; suppresses cell output entirely:\n\nz = %j m3\ntest_eq(z, [[0,1,2],[3,4,5],[6,7,8]])\n\n\n%%j\nbig =: 1000 1000 $ i. 5\nbig + big;",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#cleanup",
+    "href": "j.html#cleanup",
+    "title": "j",
+    "section": "Cleanup",
+    "text": "Cleanup\nFree the engines this notebook started: the magic’s session, the J object’s, and the raw walkthrough one.\n\nif magic.o: magic.o.close()\nj.close()\nlib.JFree(jt)\n\n0",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "jnb",
+    "section": "",
+    "text": "jnb brings the J language to notebooks: a %%j cell magic and %j line magic for Jupyter and IPython, and a real Jupyter kernel. J runs in-process through libj, the engine library that ships with every J install, so there is no separate process or protocol to manage.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#installation",
+    "href": "index.html#installation",
+    "title": "jnb",
+    "section": "Installation",
+    "text": "Installation\nInstall J: pip install jlanguage, or install it from jsoftware.com – jnb finds either. Then:\npip install jnb\nTo register the magics with every IPython and Jupyter session automatically, run in your terminal:\njnb_install\nThe J session only starts the first time you run a magic, so having jnb installed everywhere costs nothing when you don’t use it. To install the Jupyter kernel: python -m jnb.jkernel install.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#the-j-magics",
+    "href": "index.html#the-j-magics",
+    "title": "jnb",
+    "section": "The j magics",
+    "text": "The j magics\n%%j runs code in a persistent J session and displays its output verbatim; %j expr returns an expression’s value as a Python object. The session keeps nouns and verbs across cells:\n\n%%j\nm =: 3 3 $ i. 9\nm +/ . * m\n\n15 18  21\n42 54  66\n69 90 111\n\n\n\nz = %j m\nz\n\n[[0, 1, 2], [3, 4, 5], [6, 7, 8]]\n\n\nUnder the hood there’s no separate process or protocol: jnb loads libj via ctypes, so completion, errors, and interrupts come straight from the engine’s C API. Call the J session class to run code, move values in both directions with [], and lift verbs into Python callables with fn – see j for the full walkthrough.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#the-j-jupyter-kernel",
+    "href": "index.html#the-j-jupyter-kernel",
+    "title": "jnb",
+    "section": "The J Jupyter kernel",
+    "text": "The J Jupyter kernel\njnb ships jkernel, a real Jupyter kernel for J built on kernmini: any Jupyter client (JupyterLab, nbclient, jupygate, and LLM agents through clikernel) can execute J with workspace state persisting across cells, stream session output live, and interrupt a long computation with a J attention interrupt while keeping the workspace. python -m jnb.jkernel install registers the kernelspec.\nOn startup the kernel runs ~/.config/jnb/startup.ijs (if it exists) in the session.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#limitations",
+    "href": "index.html#limitations",
+    "title": "jnb",
+    "section": "Limitations",
+    "text": "Limitations\n\n%j transfers values through the engine’s typed-array API, so it’s limited to booleans, integers, floats, and characters; boxed, extended, and rational values raise (display them with %%j instead).\nWindows isn’t supported yet: the libj binding is untested there. macOS and Linux are supported.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#learning-j",
+    "href": "index.html#learning-j",
+    "title": "jnb",
+    "section": "Learning J",
+    "text": "Learning J\nStart with Learning J and the J wiki, whose NuVoc page is the reference for every primitive.",
+    "crumbs": [
+      "jnb"
+    ]
+  }
+]
