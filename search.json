@@ -1,0 +1,162 @@
+[
+  {
+    "objectID": "j.html",
+    "href": "j.html",
+    "title": "j",
+    "section": "",
+    "text": "jnb runs J in the Python process by loading libj, the engine used by jconsole. Direct calls report completion and errors without parsing console prompts. Output arrives through a callback. Another thread can interrupt a computation with JInterrupt.\nThis notebook builds the binding up one step at a time. Install J with pip install jlanguage or a Jsoftware distribution. The engine library and profile.ijs, which loads the standard library, are in the installation’s bin directory.",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#finding-j",
+    "href": "j.html#finding-j",
+    "title": "j",
+    "section": "Finding J",
+    "text": "Finding J\n\n\nsource\n\nfind_j\ndef find_j():\nLocate the J binary directory: the one containing libj and profile.ijs\n\n\nfind_j checks for libj beside jconsole, resolving symlinks first. The jlanguage console script is a Python wrapper without libj beside it. For that installation, find_j obtains the path from jlang. It also checks common installation directories.\n\nfind_j()\n\nPath('/Users/jhoward/aai-ws/.venv/lib/python3.13/site-packages/jlang/bin')",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#the-engine",
+    "href": "j.html#the-engine",
+    "title": "j",
+    "section": "The engine",
+    "text": "The engine\n\n\nsource\n\nload_j\ndef load_j(\n    jbin:NoneType=None\n):\nLoad libj from jbin (or find_j()), declare its C signatures, and return (jbin,lib)\n\n\nJ declares its C API in jsource/jsrc/jlib.h. JInit2 creates an engine with its installation path. The engine needs this path to find libgmp for extended precision. Do not substitute JInit. Mixing the two initializers in one process can cause a crash.\nJDo executes one line. JSM registers five callback slots: {output, wd, input, unused, options}. We use the same arrangement as jconsole: {Joutput, 0, Jinput, 0, SMCON}.\nThe output callback receives a type and a pointer. These types need different handling:\n\nType 1 contains formatted output.\nType 2 contains an error display.\nType 5 requests exit through 2!:55. The pointer value is the exit code, including NULL for zero.\n\nThe input callback supplies continuation lines for multi-line definitions. The first example only collects output in a list.\n\njbin,lib = load_j()\njt = lib.JInit2(str(jbin).encode())\nout = []\n@_OUTCB\ndef outcb(j,typ,p): out.append((typ, ctypes.string_at(p).decode('utf-8','replace') if p else p))\ncbs = (c_void_p*5)(cast(outcb,c_void_p), None, None, None, _SMCON)\nlib.JSM(jt, cbs)\nlib.JDo(jt, b'+/ % # 1 2 3 4'), out\n\n(0, [(1, '0.25\\n')])\n\n\nJDo returns zero on success or a J error number on failure. Output callbacks finish before it returns.\nA new engine has no standard library. The following sentence sets BINPATH and ARGV, then runs profile.ijs, following jefirst in jsource/jsrc/jeload.c. J evaluates right to left, starting with BINPATH.\n\nout.clear()\nboot = f\"(3 : '0!:0 y')&lt;BINPATH,'/profile.ijs'[ARGV_z_=:&lt;'jconsole'[BINPATH_z_=:'{jbin}'\"\nlib.JDo(jt, boot.encode()), out\n\n(0, [])\n\n\nCall toupper from the standard library.\n\nout.clear()\nlib.JDo(jt, b\"toupper 'j is here'\"), out\n\n(0, [(1, 'J IS HERE\\n')])",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#errors",
+    "href": "j.html#errors",
+    "title": "j",
+    "section": "Errors",
+    "text": "Errors\nA domain error returns error number 3 and a type-2 output containing the explanation. JError uses this output as its exception message.\n\nout.clear()\nlib.JDo(jt, b\"1 + 'a'\"), out\n\n(3, [(2, \"|domain error, executing dyad +\\n|y is character\\n|   1    +'a'\\n\")])\n\n\n\n\nsource\n\nJError\ndef JError(\n    *args, **kwargs\n):\nA J error, carrying the session’s output (including the error display) as its message",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#a-session-object",
+    "href": "j.html#a-session-object",
+    "title": "j",
+    "section": "A session object",
+    "text": "A session object\nJ creates an engine with callbacks and the standard library loaded. It collects output as (type, text) pairs and records exit requests separately. The output callback handles NULL pointers.\nrun queues lines of J code. It sends top-level lines through JDo. When J opens a multi-line definition, the input callback supplies its body from the same queue.\nThe input buffer must remain alive after the callback returns. The engine reads it afterward. J keeps the buffer on the instance to avoid the memory leak caused by returning Python bytes directly from a ctypes callback.\n\n\nsource\n\nJ\ndef J(\n    jbin:NoneType=None\n):\nA J session: the libj engine loaded in-process, with the stdlib profile booted\n\n\nrun returns the session’s output. A J error raises JError with that output, including the error display.\n\n\nsource\n\nJ.run\ndef run(\n    code\n):\nRun code (one or more lines of J) in the session, returning its output; raises JError on J errors\n\n\n\nj = J()\nprint(j.run('m =: 2 3 $ 10 * 1 + i. 6\\nm'))\n\n10 20 30\n40 50 60\n\n\n\nCheck that state persists, multi-line definitions work, and errors raise JError.\n\ntest_eq(j.run('+/ , m'), '210\\n')\ntest_eq(j.run('mean =: 3 : 0\\n(+/ y) % # y\\n)\\nmean 1 2 3 4'), '2.5\\n')\ntest_fail(lambda: j.run(\"m + 'x'\"), contains='domain error')\n\nCall the session directly to display output without print. The result is a JOut string with a verbatim representation. String comparison and slicing still work. A call without output returns None.\n\n\nsource\n\nJ.__call__\ndef __call__(\n    code\n):\nRun code, returning session output (or None if there is none)\n\n\n\n\nsource\n\nJOut\ndef JOut(\n    *args, **kwargs\n):\nOutput text from a J call; displays verbatim\n\n\n\nj('m ,. |. m')\n\n10 20 30 40 50 60\n40 50 60 10 20 30\n\n\n\ntest_eq(j('+/ , m'), '210\\n')\ntest_is(j('m2 =: 10 * m'), None)\n\nCalculate 25 factorial with extended precision.\n\nj('*/ 1 + i. 25x')\n\n15511210043330985984000000",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#getting-values-into-python",
+    "href": "j.html#getting-values-into-python",
+    "title": "j",
+    "section": "Getting values into Python",
+    "text": "Getting values into Python\nUse getm to read a named J noun as Python data. run returns display text.\nJGetM provides the noun’s type, rank, dimensions and a pointer to its flat data. getm converts characters to strings and numeric arrays to nested lists. Booleans, integers and floats are supported. Boxed, extended and rational values raise JError.\n\n\nsource\n\nJ.getm\ndef getm(\n    name\n):\nRead noun name into Python: str for characters; int/float scalars and (nested) lists otherwise\n\n\nj[expr] calls pyval to evaluate an expression and return Python data. It temporarily assigns the result to jnbtmp, reads it, then erases that noun.\n\n\nsource\n\nJ.__getitem__\ndef __getitem__(\n    expr\n):\n\n\n\n\nsource\n\nJ.pyval\ndef pyval(\n    expr\n):\nEvaluate expr and return the result as a Python value\n\n\n\ntest_eq(j['m'], [[10,20,30],[40,50,60]])\ntest_eq(j['m &gt; 25'], [[0,0,1],[1,1,1]])\ntest_eq(j['+/ % # 1 2 3 4'], 0.25)\ntest_eq(j[\"'py' , 'val'\"], 'pyval')\n\nAssign Python data with j[name] = value. JSetM accepts the typed buffers built by _jdat. Strings become J character arrays. Numeric arrays use integers unless any element is a float.\nfn turns a J verb into a Python callable. Pass one argument for monadic use or two for dyadic use, with the left argument first.\n\n\nsource\n\nJ.__setitem__\ndef __setitem__(\n    nm, v\n):\nAssign Python value v (scalar, string, or nested list) to noun nm\n\n\n\nj['q'] = [[1,2],[3,4.5]]\ntest_eq(j['q'], [[1,2],[3,4.5]])\nj['s'] = \"it's\"\ntest_eq(j['s'], \"it's\")\ntest_eq(j['+/ , q'], 10.5)\n\n\n\nsource\n\nJ.fn\ndef fn(\n    code\n):\nA Python callable applying J verb code monadically or dyadically (left argument first)\n\n\n\nsq = j.fn('*:')\ntest_eq(sq([1,2,3]), [1,4,9])\ntest_eq(j.fn('+/')([1,2,3]), 6)\ntest_eq(j.fn('{.')(2, [5,6,7]), [5,6])",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#interrupting",
+    "href": "j.html#interrupting",
+    "title": "j",
+    "section": "Interrupting",
+    "text": "Interrupting\nCall interrupt from another thread to stop a running computation. The thread inside JDo cannot run Python signal handlers until the C call returns. The jkernel worker handles SIGINT through another thread.\nJInterrupt sets the engine’s break flag. J reports an attention interrupt error, after which the session remains usable.\n\n\nsource\n\nJ.interrupt\ndef interrupt():\nStop the currently running sentence with an attention interrupt; safe to call from another thread\n\n\n\nimport threading,time\n\n\nj('spin =: 3 : 0\\nn =. 0\\nwhile. n &lt; 1e8 do. n =. n + 1 end.\\n)')\nt0 = time.time()\nthreading.Timer(0.5, j.interrupt).start()\ntest_fail(lambda: j('spin 0'), contains='attention interrupt')\nassert time.time()-t0 &lt; 5\ntest_eq(j('2+2'), '4\\n')",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#exit-requests-and-shutdown",
+    "href": "j.html#exit-requests-and-shutdown",
+    "title": "j",
+    "section": "Exit requests and shutdown",
+    "text": "Exit requests and shutdown\nexit 0 calls the 2!:55 foreign to request exit. J records the requested code in .exited. run stops processing queued lines and returns without raising. The host, such as jkernel, decides how to handle the request.\nThe engine runs inside Python, with no child process to leave running. close frees its memory. A with block calls close on exit. Do not use a closed session.\n\n\nsource\n\nJ.__exit__\ndef __exit__(\n    *args\n):\n\n\n\n\nsource\n\nJ.__enter__\ndef __enter__():\n\n\n\n\nsource\n\nJ.close\ndef close():\nFree the engine instance; the session is unusable afterwards\n\n\n\nwith J() as j2:\n    test_is(j2.exited, None)\n    j2('exit 7')\n    test_eq(j2.exited, 7)",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#the-j-magics",
+    "href": "j.html#the-j-magics",
+    "title": "j",
+    "section": "The j magics",
+    "text": "The j magics\nLoad the extension with %load_ext jnb. It registers two magics:\n\n%%j runs a cell and displays its output verbatim. A trailing ; suppresses the display.\n%j expr returns Python data, as j[expr] does. You can assign the result, for example z = %j z.\n\nThe engine starts on the first call to a magic.\n\n\nsource\n\nJMagic\ndef JMagic(\n    jbin:NoneType=None\n):\nIPython %j/%%j magics, driving a lazily-started J session\n\n\n\n\nsource\n\nload_ipython_extension\ndef load_ipython_extension(\n    ipython\n):\nRequired function for creating magic\n\n\n\n\nsource\n\ncreate_j_magic\ndef create_j_magic(\n    shell:NoneType=None\n):\nCreate a JMagic and register its j line/cell magic with shell, returning it\n\n\n\n# Only required if you don't load the extension\nmagic = create_j_magic()\n\n\n\nsource\n\ncreate_ipython_config\ndef create_ipython_config():\nCalled by jnb_install to register the extension in every IPython and Jupyter session\n\n\n\n\nsource\n\nload_ipython_extension\ndef load_ipython_extension(\n    ipython\n):\nRegister the j magics: %load_ext jnb\n\n\n\n%%j\nm3 =: 3 3 $ i. 9\nm3 +/ . * m3\n\n15 18  21\n42 54  66\n69 90 111\n\n\nAssign a J result to a Python variable, then suppress a cell’s output.\n\nz = %j m3\ntest_eq(z, [[0,1,2],[3,4,5],[6,7,8]])\n\n\n%%j\nbig =: 1000 1000 $ i. 5\nbig + big;",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "j.html#cleanup",
+    "href": "j.html#cleanup",
+    "title": "j",
+    "section": "Cleanup",
+    "text": "Cleanup\nFree the engines created by these examples.\n\nif magic.o: magic.o.close()\nj.close()\nlib.JFree(jt)\n\n0",
+    "crumbs": [
+      "j"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "jnb",
+    "section": "",
+    "text": "jnb runs the J language in notebooks. It provides %%j and %j magics for Python notebooks, and a Jupyter kernel for notebooks written in J. Both load libj, J’s engine library, into the Python process.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#installation",
+    "href": "index.html#installation",
+    "title": "jnb",
+    "section": "Installation",
+    "text": "Installation\nInstall J with pip install jlanguage or from jsoftware.com. Then install jnb:\npip install jnb\nTo register the magics automatically in IPython and Jupyter sessions, run:\njnb_install\nYou can also load them for one session with %load_ext jnb. The J engine starts when you first run a magic.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#the-j-magics",
+    "href": "index.html#the-j-magics",
+    "title": "jnb",
+    "section": "The j magics",
+    "text": "The j magics\n%%j runs code and displays J’s output verbatim. %j expr returns an expression’s value as Python data. The session keeps nouns and verbs across cells:\n\n%%j\nm =: 3 3 $ i. 9\nm +/ . * m\n\n15 18  21\n42 54  66\n69 90 111\n\n\n\nz = %j m\nz\n\n[[0, 1, 2], [3, 4, 5], [6, 7, 8]]\n\n\nYou can also use the J session class directly. It runs J code, transfers values in both directions with [], and converts J verbs to Python callables with fn. See the j module documentation for examples.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#the-j-jupyter-kernel",
+    "href": "index.html#the-j-jupyter-kernel",
+    "title": "jnb",
+    "section": "The J Jupyter kernel",
+    "text": "The J Jupyter kernel\njkernel is a Jupyter kernel for J built on kernmini. Register it with:\npython -m jnb.jkernel install\nUse it from JupyterLab, nbclient, jupygate, or agents using clikernel. Workspace state persists across cells. A J attention interrupt stops a computation without resetting the workspace.\nThe kernel runs jnb/startup.ijs from your XDG configuration directory when that file exists. The default path is ~/.config/jnb/startup.ijs.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#limitations",
+    "href": "index.html#limitations",
+    "title": "jnb",
+    "section": "Limitations",
+    "text": "Limitations\n\n%j can return booleans, integers, floats and characters as Python data. Boxed, extended and rational values raise an error. Use %%j to display them.\nmacOS and Linux are supported. The libj binding is untested on Windows, which is not yet supported.",
+    "crumbs": [
+      "jnb"
+    ]
+  },
+  {
+    "objectID": "index.html#learning-j",
+    "href": "index.html#learning-j",
+    "title": "jnb",
+    "section": "Learning J",
+    "text": "Learning J\nStart with Learning J and the J wiki, whose NuVoc page is the reference for every primitive.",
+    "crumbs": [
+      "jnb"
+    ]
+  }
+]
