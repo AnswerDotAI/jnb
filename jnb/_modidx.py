@@ -31,5 +31,4 @@ d = { 'settings': { 'branch': 'main',
                        'jnb.j.create_j_magic': ('j.html#create_j_magic', 'jnb/j.py'),
                        'jnb.j.find_j': ('j.html#find_j', 'jnb/j.py'),
                        'jnb.j.load_ipython_extension': ('j.html#load_ipython_extension', 'jnb/j.py'),
-                       'jnb.j.load_j': ('j.html#load_j', 'jnb/j.py')},
-            'jnb.jkernel': {}}}
+                       'jnb.j.load_j': ('j.html#load_j', 'jnb/j.py')}}}
