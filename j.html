@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Running J in-process through libj, and j magics for Jupyter and IPython">
+
+<title>j – jnb</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-f2788e636de456f6409e966386820849.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="j – jnb">
+<meta property="og:description" content="Running J in-process through libj, and j magics for Jupyter and IPython">
+<meta property="og:site_name" content="jnb">
+<meta name="twitter:title" content="j – jnb">
+<meta name="twitter:description" content="Running J in-process through libj, and j magics for Jupyter and IPython">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">jnb</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./j.html">j</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">jnb</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./j.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">j</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#finding-j" id="toc-finding-j" class="nav-link active" data-scroll-target="#finding-j">Finding J</a></li>
+  <li><a href="#the-engine" id="toc-the-engine" class="nav-link" data-scroll-target="#the-engine">The engine</a></li>
+  <li><a href="#errors" id="toc-errors" class="nav-link" data-scroll-target="#errors">Errors</a></li>
+  <li><a href="#a-session-object" id="toc-a-session-object" class="nav-link" data-scroll-target="#a-session-object">A session object</a></li>
+  <li><a href="#getting-values-into-python" id="toc-getting-values-into-python" class="nav-link" data-scroll-target="#getting-values-into-python">Getting values into Python</a></li>
+  <li><a href="#interrupting" id="toc-interrupting" class="nav-link" data-scroll-target="#interrupting">Interrupting</a></li>
+  <li><a href="#exit-requests-and-shutdown" id="toc-exit-requests-and-shutdown" class="nav-link" data-scroll-target="#exit-requests-and-shutdown">Exit requests and shutdown</a></li>
+  <li><a href="#the-j-magics" id="toc-the-j-magics" class="nav-link" data-scroll-target="#the-j-magics">The <code>j</code> magics</a></li>
+  <li><a href="#cleanup" id="toc-cleanup" class="nav-link" data-scroll-target="#cleanup">Cleanup</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/AnswerDotAI/jnb/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="j.html.md"><i class="bi bi-file-code"></i>Markdown</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">j</h1>
+</div>
+
+<div>
+  <div class="description">
+    Running J in-process through libj, and <code>j</code> magics for Jupyter and IPython
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<p>jnb runs J in the Python process by loading libj, the engine used by <code>jconsole</code>. Direct calls report completion and errors without parsing console prompts. Output arrives through a callback. Another thread can interrupt a computation with <code>JInterrupt</code>.</p>
+<p>This notebook builds the binding up one step at a time. Install J with <code>pip install jlanguage</code> or a Jsoftware distribution. The engine library and <code>profile.ijs</code>, which loads the standard library, are in the installation’s <code>bin</code> directory.</p>
+<section id="finding-j" class="level2">
+<h2 class="anchored" data-anchor-id="finding-j">Finding J</h2>
+<div id="0fb68aca" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.831165+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.898732+00:00&quot;,&quot;total&quot;:0.06757144299999851}}" data-execution_count="3">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L22" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="find_j" class="level3">
+<h3 class="anchored" data-anchor-id="find_j">find_j</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> find_j():</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Locate the J binary directory: the one containing libj and profile.ijs</em></p>
+</section>
+</div>
+<p><a href="https://AnswerDotAI.github.io/jnb/j.html#find_j"><code>find_j</code></a> checks for libj beside <code>jconsole</code>, resolving symlinks first. The <code>jlanguage</code> console script is a Python wrapper without libj beside it. For that installation, <a href="https://AnswerDotAI.github.io/jnb/j.html#find_j"><code>find_j</code></a> obtains the path from <code>jlang</code>. It also checks common installation directories.</p>
+<div id="af9db711" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>find_j()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>Path('/Users/jhoward/aai-ws/.venv/lib/python3.13/site-packages/jlang/bin')</code></pre>
+</div>
+</div>
+</section>
+<section id="the-engine" class="level2">
+<h2 class="anchored" data-anchor-id="the-engine">The engine</h2>
+<div id="6c54b888" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.900440+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.903380+00:00&quot;,&quot;total&quot;:0.0029426150000020357}}" data-execution_count="5">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L39" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="load_j" class="level3">
+<h3 class="anchored" data-anchor-id="load_j">load_j</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_j(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    jbin:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Load libj from <code>jbin</code> (or <a href="https://AnswerDotAI.github.io/jnb/j.html#find_j"><code>find_j()</code></a>), declare its C signatures, and return <code>(jbin,lib)</code></em></p>
+</section>
+</div>
+<p>J declares its C API in <code>jsource/jsrc/jlib.h</code>. <code>JInit2</code> creates an engine with its installation path. The engine needs this path to find <code>libgmp</code> for extended precision. Do not substitute <code>JInit</code>. Mixing the two initializers in one process can cause a crash.</p>
+<p><code>JDo</code> executes one line. <code>JSM</code> registers five callback slots: <code>{output, wd, input, unused, options}</code>. We use the same arrangement as <code>jconsole</code>: <code>{Joutput, 0, Jinput, 0, SMCON}</code>.</p>
+<p>The output callback receives a type and a pointer. These types need different handling:</p>
+<ul>
+<li>Type 1 contains formatted output.</li>
+<li>Type 2 contains an error display.</li>
+<li>Type 5 requests exit through <code>2!:55</code>. The pointer value is the exit code, including NULL for zero.</li>
+</ul>
+<p>The input callback supplies continuation lines for multi-line definitions. The first example only collects output in a list.</p>
+<div id="18179375" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>jbin,lib <span class="op">=</span> load_j()</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>jt <span class="op">=</span> lib.JInit2(<span class="bu">str</span>(jbin).encode())</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>out <span class="op">=</span> []</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="at">@_OUTCB</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> outcb(j,typ,p): out.append((typ, ctypes.string_at(p).decode(<span class="st">'utf-8'</span>,<span class="st">'replace'</span>) <span class="cf">if</span> p <span class="cf">else</span> p))</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>cbs <span class="op">=</span> (c_void_p<span class="op">*</span><span class="dv">5</span>)(cast(outcb,c_void_p), <span class="va">None</span>, <span class="va">None</span>, <span class="va">None</span>, _SMCON)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>lib.JSM(jt, cbs)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>lib.JDo(jt, <span class="st">b'+/ % # 1 2 3 4'</span>), out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>(0, [(1, '0.25\n')])</code></pre>
+</div>
+</div>
+<p><code>JDo</code> returns zero on success or a J error number on failure. Output callbacks finish before it returns.</p>
+<p>A new engine has no standard library. The following sentence sets <code>BINPATH</code> and <code>ARGV</code>, then runs <code>profile.ijs</code>, following <code>jefirst</code> in <code>jsource/jsrc/jeload.c</code>. J evaluates right to left, starting with <code>BINPATH</code>.</p>
+<div id="0e6f30ad" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>out.clear()</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>boot <span class="op">=</span> <span class="ss">f"(3 : '0!:0 y')&lt;BINPATH,'/profile.ijs'[ARGV_z_=:&lt;'jconsole'[BINPATH_z_=:'</span><span class="sc">{</span>jbin<span class="sc">}</span><span class="ss">'"</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>lib.JDo(jt, boot.encode()), out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>(0, [])</code></pre>
+</div>
+</div>
+<p>Call <code>toupper</code> from the standard library.</p>
+<div id="8e2f735f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>out.clear()</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>lib.JDo(jt, <span class="st">b"toupper 'j is here'"</span>), out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>(0, [(1, 'J IS HERE\n')])</code></pre>
+</div>
+</div>
+</section>
+<section id="errors" class="level2">
+<h2 class="anchored" data-anchor-id="errors">Errors</h2>
+<p>A domain error returns error number 3 and a type-2 output containing the explanation. <a href="https://AnswerDotAI.github.io/jnb/j.html#jerror"><code>JError</code></a> uses this output as its exception message.</p>
+<div id="5c0133a8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>out.clear()</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>lib.JDo(jt, <span class="st">b"1 + 'a'"</span>), out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>(3, [(2, "|domain error, executing dyad +\n|y is character\n|   1    +'a'\n")])</code></pre>
+</div>
+</div>
+<div id="7310fc76" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.904693+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.906967+00:00&quot;,&quot;total&quot;:0.002276437999995551}}" data-execution_count="7">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L52" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="jerror" class="level3">
+<h3 class="anchored" data-anchor-id="jerror">JError</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> JError(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>args, <span class="op">**</span>kwargs</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>A J error, carrying the session’s output (including the error display) as its message</em></p>
+</section>
+</div>
+</section>
+<section id="a-session-object" class="level2">
+<h2 class="anchored" data-anchor-id="a-session-object">A session object</h2>
+<p><a href="https://AnswerDotAI.github.io/jnb/j.html#j"><code>J</code></a> creates an engine with callbacks and the standard library loaded. It collects output as <code>(type, text)</code> pairs and records exit requests separately. The output callback handles NULL pointers.</p>
+<p><code>run</code> queues lines of J code. It sends top-level lines through <code>JDo</code>. When J opens a multi-line definition, the input callback supplies its body from the same queue.</p>
+<p>The input buffer must remain alive after the callback returns. The engine reads it afterward. <a href="https://AnswerDotAI.github.io/jnb/j.html#j"><code>J</code></a> keeps the buffer on the instance to avoid the memory leak caused by returning Python <code>bytes</code> directly from a ctypes callback.</p>
+<div id="042722ea" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.909113+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.912503+00:00&quot;,&quot;total&quot;:0.003393430000002695}}" data-execution_count="9">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L56" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j" class="level3">
+<h3 class="anchored" data-anchor-id="j">J</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> J(</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    jbin:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>A J session: the libj engine loaded in-process, with the stdlib profile booted</em></p>
+</section>
+</div>
+<p><code>run</code> returns the session’s output. A J error raises <a href="https://AnswerDotAI.github.io/jnb/j.html#jerror"><code>JError</code></a> with that output, including the error display.</p>
+<div id="cc9c6c34" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.913967+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.916858+00:00&quot;,&quot;total&quot;:0.0028932630000042536}}" data-execution_count="11">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L77" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.run" class="level3">
+<h3 class="anchored" data-anchor-id="j.run">J.run</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run(</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    code</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Run <code>code</code> (one or more lines of J) in the session, returning its output; raises <a href="https://AnswerDotAI.github.io/jnb/j.html#jerror"><code>JError</code></a> on J errors</em></p>
+</section>
+</div>
+<div id="610f2cda" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>j <span class="op">=</span> J()</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(j.run(<span class="st">'m =: 2 3 $ 10 * 1 + i. 6</span><span class="ch">\n</span><span class="st">m'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>10 20 30
+40 50 60
+</code></pre>
+</div>
+</div>
+<p>Check that state persists, multi-line definitions work, and errors raise <a href="https://AnswerDotAI.github.io/jnb/j.html#jerror"><code>JError</code></a>.</p>
+<div id="6a1740e8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>test_eq(j.run(<span class="st">'+/ , m'</span>), <span class="st">'210</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>test_eq(j.run(<span class="st">'mean =: 3 : 0</span><span class="ch">\n</span><span class="st">(+/ y) % # y</span><span class="ch">\n</span><span class="st">)</span><span class="ch">\n</span><span class="st">mean 1 2 3 4'</span>), <span class="st">'2.5</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>test_fail(<span class="kw">lambda</span>: j.run(<span class="st">"m + 'x'"</span>), contains<span class="op">=</span><span class="st">'domain error'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Call the session directly to display output without <code>print</code>. The result is a <a href="https://AnswerDotAI.github.io/jnb/j.html#jout"><code>JOut</code></a> string with a verbatim representation. String comparison and slicing still work. A call without output returns <code>None</code>.</p>
+<div id="1cc56528" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.918148+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.920455+00:00&quot;,&quot;total&quot;:0.0023090079999974478}}" data-execution_count="13">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L93" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.__call__" class="level3">
+<h3 class="anchored" data-anchor-id="j.__call__">J.__call__</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="fu">__call__</span>(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    code</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Run <code>code</code>, returning session output (or None if there is none)</em></p>
+</section>
+</div>
+<div id="d23463cc" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.920542+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.922747+00:00&quot;,&quot;total&quot;:0.0022076779999977703}}" data-execution_count="14">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L88" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="jout" class="level3">
+<h3 class="anchored" data-anchor-id="jout">JOut</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> JOut(</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>args, <span class="op">**</span>kwargs</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Output text from a <a href="https://AnswerDotAI.github.io/jnb/j.html#j"><code>J</code></a> call; displays verbatim</em></p>
+</section>
+</div>
+<div id="3ee0256b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>j(<span class="st">'m ,. |. m'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>10 20 30 40 50 60
+40 50 60 10 20 30</code></pre>
+</div>
+</div>
+<div id="3216d1b7" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>test_eq(j(<span class="st">'+/ , m'</span>), <span class="st">'210</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>test_is(j(<span class="st">'m2 =: 10 * m'</span>), <span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Calculate 25 factorial with extended precision.</p>
+<div id="9d168d50" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>j(<span class="st">'*/ 1 + i. 25x'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>15511210043330985984000000</code></pre>
+</div>
+</div>
+</section>
+<section id="getting-values-into-python" class="level2">
+<h2 class="anchored" data-anchor-id="getting-values-into-python">Getting values into Python</h2>
+<p>Use <code>getm</code> to read a named J noun as Python data. <code>run</code> returns display text.</p>
+<p><code>JGetM</code> provides the noun’s type, rank, dimensions and a pointer to its flat data. <code>getm</code> converts characters to strings and numeric arrays to nested lists. Booleans, integers and floats are supported. Boxed, extended and rational values raise <a href="https://AnswerDotAI.github.io/jnb/j.html#jerror"><code>JError</code></a>.</p>
+<div id="420ca78a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.925191+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.928351+00:00&quot;,&quot;total&quot;:0.0031631590000031906}}" data-execution_count="16">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L105" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.getm" class="level3">
+<h3 class="anchored" data-anchor-id="j.getm">J.getm</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> getm(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    name</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Read noun <code>name</code> into Python: str for characters; int/float scalars and (nested) lists otherwise</em></p>
+</section>
+</div>
+<p><code>j[expr]</code> calls <code>pyval</code> to evaluate an expression and return Python data. It temporarily assigns the result to <code>jnbtmp</code>, reads it, then erases that noun.</p>
+<div id="95aa017f" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.929445+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.931714+00:00&quot;,&quot;total&quot;:0.0022710459999970567}}" data-execution_count="18">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L125" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.__getitem__" class="level3">
+<h3 class="anchored" data-anchor-id="j.__getitem__">J.__getitem__</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="fu">__getitem__</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    expr</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</div>
+<div id="6cb7681b" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.931803+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.934163+00:00&quot;,&quot;total&quot;:0.002362267000002305}}" data-execution_count="19">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L118" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.pyval" class="level3">
+<h3 class="anchored" data-anchor-id="j.pyval">J.pyval</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pyval(</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    expr</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Evaluate <code>expr</code> and return the result as a Python value</em></p>
+</section>
+</div>
+<div id="a6425af4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">'m'</span>], [[<span class="dv">10</span>,<span class="dv">20</span>,<span class="dv">30</span>],[<span class="dv">40</span>,<span class="dv">50</span>,<span class="dv">60</span>]])</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">'m &gt; 25'</span>], [[<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">1</span>],[<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>]])</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">'+/ % # 1 2 3 4'</span>], <span class="fl">0.25</span>)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">"'py' , 'val'"</span>], <span class="st">'pyval'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Assign Python data with <code>j[name] = value</code>. <code>JSetM</code> accepts the typed buffers built by <a href="https://AnswerDotAI.github.io/jnb/j.html#_jdat"><code>_jdat</code></a>. Strings become J character arrays. Numeric arrays use integers unless any element is a float.</p>
+<p><code>fn</code> turns a J verb into a Python callable. Pass one argument for monadic use or two for dyadic use, with the left argument first.</p>
+<div id="46cad42b" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.936636+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.939385+00:00&quot;,&quot;total&quot;:0.0027511669999995547}}" data-execution_count="21">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L142" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.__setitem__" class="level3">
+<h3 class="anchored" data-anchor-id="j.__setitem__">J.__setitem__</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="fu">__setitem__</span>(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    nm, v</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Assign Python value <code>v</code> (scalar, string, or nested list) to noun <code>nm</code></em></p>
+</section>
+</div>
+<div id="a249f397" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>j[<span class="st">'q'</span>] <span class="op">=</span> [[<span class="dv">1</span>,<span class="dv">2</span>],[<span class="dv">3</span>,<span class="fl">4.5</span>]]</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">'q'</span>], [[<span class="dv">1</span>,<span class="dv">2</span>],[<span class="dv">3</span>,<span class="fl">4.5</span>]])</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>j[<span class="st">'s'</span>] <span class="op">=</span> <span class="st">"it's"</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">'s'</span>], <span class="st">"it's"</span>)</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>test_eq(j[<span class="st">'+/ , q'</span>], <span class="fl">10.5</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="9b0c0f8e" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.940727+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.943260+00:00&quot;,&quot;total&quot;:0.0025358729999993557}}" data-execution_count="23">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L151" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.fn" class="level3">
+<h3 class="anchored" data-anchor-id="j.fn">J.fn</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fn(</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    code</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>A Python callable applying J verb <code>code</code> monadically or dyadically (left argument first)</em></p>
+</section>
+</div>
+<div id="2fe4d8b2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>sq <span class="op">=</span> j.fn(<span class="st">'*:'</span>)</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>test_eq(sq([<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]), [<span class="dv">1</span>,<span class="dv">4</span>,<span class="dv">9</span>])</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>test_eq(j.fn(<span class="st">'+/'</span>)([<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]), <span class="dv">6</span>)</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>test_eq(j.fn(<span class="st">'{.'</span>)(<span class="dv">2</span>, [<span class="dv">5</span>,<span class="dv">6</span>,<span class="dv">7</span>]), [<span class="dv">5</span>,<span class="dv">6</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="interrupting" class="level2">
+<h2 class="anchored" data-anchor-id="interrupting">Interrupting</h2>
+<p>Call <code>interrupt</code> from another thread to stop a running computation. The thread inside <code>JDo</code> cannot run Python signal handlers until the C call returns. The jkernel worker handles SIGINT through another thread.</p>
+<p><code>JInterrupt</code> sets the engine’s break flag. J reports an attention interrupt error, after which the session remains usable.</p>
+<div id="499bd6ce" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.944352+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.946564+00:00&quot;,&quot;total&quot;:0.0022145619999989208}}" data-execution_count="25">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L163" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.interrupt" class="level3">
+<h3 class="anchored" data-anchor-id="j.interrupt">J.interrupt</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> interrupt():</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Stop the currently running sentence with an attention interrupt; safe to call from another thread</em></p>
+</section>
+</div>
+<div id="5db27f7d" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.946645+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.947180+00:00&quot;,&quot;total&quot;:0.0005373669999997333}}" data-execution_count="26">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> threading,time</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="41a42c09" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>j(<span class="st">'spin =: 3 : 0</span><span class="ch">\n</span><span class="st">n =. 0</span><span class="ch">\n</span><span class="st">while. n &lt; 1e8 do. n =. n + 1 end.</span><span class="ch">\n</span><span class="st">)'</span>)</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.time()</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>threading.Timer(<span class="fl">0.5</span>, j.interrupt).start()</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>test_fail(<span class="kw">lambda</span>: j(<span class="st">'spin 0'</span>), contains<span class="op">=</span><span class="st">'attention interrupt'</span>)</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> time.time()<span class="op">-</span>t0 <span class="op">&lt;</span> <span class="dv">5</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>test_eq(j(<span class="st">'2+2'</span>), <span class="st">'4</span><span class="ch">\n</span><span class="st">'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="exit-requests-and-shutdown" class="level2">
+<h2 class="anchored" data-anchor-id="exit-requests-and-shutdown">Exit requests and shutdown</h2>
+<p><code>exit 0</code> calls the <code>2!:55</code> foreign to request exit. <a href="https://AnswerDotAI.github.io/jnb/j.html#j"><code>J</code></a> records the requested code in <code>.exited</code>. <code>run</code> stops processing queued lines and returns without raising. The host, such as jkernel, decides how to handle the request.</p>
+<p>The engine runs inside Python, with no child process to leave running. <code>close</code> frees its memory. A <code>with</code> block calls <code>close</code> on exit. Do not use a closed session.</p>
+<div id="67757440" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.948544+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.950770+00:00&quot;,&quot;total&quot;:0.002228666999997131}}" data-execution_count="28">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L178" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.__exit__" class="level3">
+<h3 class="anchored" data-anchor-id="j.__exit__">J.__exit__</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="fu">__exit__</span>(</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>args</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</div>
+<div id="0f6573ea" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.950859+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.953018+00:00&quot;,&quot;total&quot;:0.0021616020000010394}}" data-execution_count="29">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L175" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.__enter__" class="level3">
+<h3 class="anchored" data-anchor-id="j.__enter__">J.__enter__</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="fu">__enter__</span>():</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</div>
+<div id="7569ab93" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.953106+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.955374+00:00&quot;,&quot;total&quot;:0.0022705059999950095}}" data-execution_count="30">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L169" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="j.close" class="level3">
+<h3 class="anchored" data-anchor-id="j.close">J.close</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> close():</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Free the engine instance; the session is unusable afterwards</em></p>
+</section>
+</div>
+<div id="188657c2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> J() <span class="im">as</span> j2:</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>    test_is(j2.exited, <span class="va">None</span>)</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>    j2(<span class="st">'exit 7'</span>)</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    test_eq(j2.exited, <span class="dv">7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="the-j-magics" class="level2">
+<h2 class="anchored" data-anchor-id="the-j-magics">The <code>j</code> magics</h2>
+<p>Load the extension with <code>%load_ext jnb</code>. It registers two magics:</p>
+<ul>
+<li><code>%%j</code> runs a cell and displays its output verbatim. A trailing <code>;</code> suppresses the display.</li>
+<li><code>%j expr</code> returns Python data, as <code>j[expr]</code> does. You can assign the result, for example <code>z = %j z</code>.</li>
+</ul>
+<p>The engine starts on the first call to a magic.</p>
+<div id="ebad984f" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.957064+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.959382+00:00&quot;,&quot;total&quot;:0.0023207300000009923}}" data-execution_count="32">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L181" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="jmagic" class="level3">
+<h3 class="anchored" data-anchor-id="jmagic">JMagic</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> JMagic(</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>    jbin:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>IPython <code>%j</code>/<code>%%j</code> magics, driving a lazily-started <a href="https://AnswerDotAI.github.io/jnb/j.html#j"><code>J</code></a> session</em></p>
+</section>
+</div>
+<div id="5102dbee" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.960430+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.962663+00:00&quot;,&quot;total&quot;:0.0022354199999981006}}" data-execution_count="34">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L207" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="load_ipython_extension" class="level3">
+<h3 class="anchored" data-anchor-id="load_ipython_extension">load_ipython_extension</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_ipython_extension(</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>    ipython</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Required function for creating magic</em></p>
+</section>
+</div>
+<div id="2b5b9e8a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.962758+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.965147+00:00&quot;,&quot;total&quot;:0.0023910219999976334}}" data-execution_count="35">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L195" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="create_j_magic" class="level3">
+<h3 class="anchored" data-anchor-id="create_j_magic">create_j_magic</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> create_j_magic(</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>    shell:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Create a <a href="https://AnswerDotAI.github.io/jnb/j.html#jmagic"><code>JMagic</code></a> and register its <code>j</code> line/cell magic with <code>shell</code>, returning it</em></p>
+</section>
+</div>
+<div id="8cd995fb" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Only required if you don't load the extension</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>magic <span class="op">=</span> create_j_magic()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="c66b0c82" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.966537+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.969039+00:00&quot;,&quot;total&quot;:0.0025043039999985695}}" data-execution_count="37">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L211" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="create_ipython_config" class="level3">
+<h3 class="anchored" data-anchor-id="create_ipython_config">create_ipython_config</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> create_ipython_config():</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Called by <code>jnb_install</code> to register the extension in every IPython and Jupyter session</em></p>
+</section>
+</div>
+<div id="d1cad628" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-24T16:53:06.969125+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-24T16:53:06.971392+00:00&quot;,&quot;total&quot;:0.0022699449999947774}}" data-execution_count="38">
+<hr>
+<p><a href="https://github.com/AnswerDotAI/jnb/blob/main/jnb/j.py#L207" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="load_ipython_extension-1" class="level3">
+<h3 class="anchored" data-anchor-id="load_ipython_extension-1">load_ipython_extension</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_ipython_extension(</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>    ipython</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>):</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Register the <code>j</code> magics: <code>%load_ext jnb</code></em></p>
+</section>
+</div>
+<div id="6a411ebf" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="op">%%</span>j</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>m3 <span class="op">=</span>: <span class="dv">3</span> <span class="dv">3</span> $ i. <span class="dv">9</span></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>m3 <span class="op">+/</span> . <span class="op">*</span> m3</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>15 18  21
+42 54  66
+69 90 111</code></pre>
+</div>
+</div>
+<p>Assign a J result to a Python variable, then suppress a cell’s output.</p>
+<div id="de5a125f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>z <span class="op">=</span> <span class="op">%</span>j m3</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>test_eq(z, [[<span class="dv">0</span>,<span class="dv">1</span>,<span class="dv">2</span>],[<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>],[<span class="dv">6</span>,<span class="dv">7</span>,<span class="dv">8</span>]])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="27a7a304" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="op">%%</span>j</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>big <span class="op">=</span>: <span class="dv">1000</span> <span class="dv">1000</span> $ i. <span class="dv">5</span></span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>big <span class="op">+</span> big<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="cleanup" class="level2">
+<h2 class="anchored" data-anchor-id="cleanup">Cleanup</h2>
+<p>Free the engines created by these examples.</p>
+<div id="438cd749" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> magic.o: magic.o.close()</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>j.close()</span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>lib.JFree(jt)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>0</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/AnswerDotAI\.github\.io\/jnb");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/AnswerDotAI/jnb/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
